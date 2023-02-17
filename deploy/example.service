@@ -1,0 +1,15 @@
+[Unit]
+Description=Barabasz Python bot
+After=multi-user.target
+
+[Service]
+Type=simple
+Restart=always
+Environment="PYTHONPATH=/home/USERNAME/.local/lib/python3.8/site-packages/"
+
+WorkingDirectory=/home/USERNAME/barabasz
+ExecStartPre=/home/USERNAME/.local/bin/pipenv install
+ExecStart=/home/USERNAME/.local/bin/pipenv run python /home/USERNAME/barabasz/src/barabasz.py
+
+[Install]
+WantedBy=multi-user.target
