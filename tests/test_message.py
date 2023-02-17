@@ -40,7 +40,7 @@ def test_if_message_is_group():
                 message="Dupa 12345",
                 expiresInSeconds=0,
                 viewOnce=False,
-                groupInfo=GroupInfo(groupId=1, groupType="abc"),
+                groupInfo=GroupInfo(groupId="abc1234234", groupType="abc"),
                 mentions=[],
             ),
         ),

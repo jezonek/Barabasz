@@ -5,7 +5,7 @@ from typing import List
 
 @dataclasses.dataclass
 class GroupInfo:
-    groupId: int
+    groupId: str
     groupType: str
 
 
@@ -93,7 +93,7 @@ def map_dataMessage(data_message):
     )
     if "groupInfo" in data_message:
         datamessage.groupInfo = GroupInfo(
-            groupId=int(data_message["groupInfo"]["groupId"]),
+            groupId=data_message["groupInfo"]["groupId"],
             groupType=data_message["groupInfo"]["type"],
         )
     if "mentions" in data_message:
