@@ -1,11 +1,14 @@
 import dataclasses
+import re
 from uuid import UUID
-from typing import List
+from typing import List, Union
+from enum import Enum
+from .SETTINGS import MAIN_ADMIN_PROMPT
 
 
 @dataclasses.dataclass
 class GroupInfo:
-    groupId: int
+    groupId: str
     groupType: str
 
 
@@ -24,7 +27,7 @@ class DataMessage:
     message: str
     expiresInSeconds: int
     viewOnce: bool
-    groupInfo: GroupInfo | None = None
+    groupInfo: Union[GroupInfo, None] = None
     mentions: list[Mention] = dataclasses.field(default_factory=list)
 
 
@@ -50,6 +53,12 @@ class Message:
 
     def is_mentioned(self):
         return True if self.envelope.dataMessage.mentions else False
+
+    def is_meta(self):
+        match = re.match(
+            r".*!(?P<command>\w+) *(?P<rest>.*)", self.envelope.dataMessage.message
+        )
+        return True if match else False
 
 
 @dataclasses.dataclass
@@ -93,7 +102,7 @@ def map_dataMessage(data_message):
     )
     if "groupInfo" in data_message:
         datamessage.groupInfo = GroupInfo(
-            groupId=int(data_message["groupInfo"]["groupId"]),
+            groupId=data_message["groupInfo"]["groupId"],
             groupType=data_message["groupInfo"]["type"],
         )
     if "mentions" in data_message:
@@ -120,3 +129,57 @@ def map_envelope(envelope):
         timestamp=envelope["timestamp"],
         dataMessage=map_dataMessage(envelope["dataMessage"]),
     )
+
+
+class Role(Enum):
+    system = 1
+    user = 2
+    assistant = 3
+
+
+@dataclasses.dataclass
+class ConversationMessage:
+    role: Role
+    message: str
+
+
+@dataclasses.dataclass
+class Conversation:
+    def __init__(
+        self,
+        history: list[ConversationMessage] = [
+            ConversationMessage(
+                role=Role.system,
+                message=MAIN_ADMIN_PROMPT,
+            )
+        ],
+    ) -> None:
+        self.history = history
+
+    def add_message(self, message: ConversationMessage) -> None:
+        self.history.append(message)
+
+    def reset(self) -> None:
+        self.history = [
+            ConversationMessage(
+                role=Role.system,
+                message=MAIN_ADMIN_PROMPT,
+            )
+        ]
+
+    def set_admin_conversation(self, messages: list[ConversationMessage]) -> None:
+        self.history = messages
+
+    def all_messages(self) -> list[ConversationMessage]:
+        return self.history
+
+    def get_conversation_in_chat_format(self) -> list[dict[str, str]]:
+        return [
+            {"role": x.role.name, "content": x.message} for x in self.all_messages()
+        ]
+
+    def get_last_message(self) -> ConversationMessage:
+        return self.history[-1]
+
+    def __repr__(self) -> str:
+        return f"Conversation: {self.history}"
