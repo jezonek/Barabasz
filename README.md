@@ -12,6 +12,7 @@ At this point, OpenAI does not provide a GPT Chat API, so the bot does not under
 - Support for group messages, (you need to add a Signal user to a group and then mention
  him in the message)
 - Open to modification- you can easily add other logic to process messages
+- Multiple OpenAI language models to choose
 
 ## Configuration
 
@@ -27,7 +28,7 @@ At this point, OpenAI does not provide a GPT Chat API, so the bot does not under
 ### Clone the repository
 
 ```Bash
-git clone xxx
+git clone git@github.com:jezonek/Barabasz.git
 ```
 
 ### Configure your own env variables
