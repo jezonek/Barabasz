@@ -1,6 +1,7 @@
 import dataclasses
 from uuid import UUID
-from typing import List
+from typing import List, Union
+from enum import Enum
 
 
 @dataclasses.dataclass
@@ -24,7 +25,7 @@ class DataMessage:
     message: str
     expiresInSeconds: int
     viewOnce: bool
-    groupInfo: GroupInfo | None = None
+    groupInfo:Union[GroupInfo, None] = None
     mentions: list[Mention] = dataclasses.field(default_factory=list)
 
 
@@ -120,3 +121,37 @@ def map_envelope(envelope):
         timestamp=envelope["timestamp"],
         dataMessage=map_dataMessage(envelope["dataMessage"]),
     )
+
+
+class Role(Enum):
+    system = 1
+    user = 2
+    assistant = 3
+
+
+@dataclasses.dataclass
+class ConversationMessage:
+    role: Role
+    message: str
+
+
+@dataclasses.dataclass
+class Conversation:
+    history: list[ConversationMessage] = dataclasses.field(default_factory=list)
+
+    def add_message(self, message: ConversationMessage) -> None:
+        self.history.append(message)
+
+    def reset(self) -> None:
+        self.history.clear()
+
+    def all_messages(self) -> list[ConversationMessage]:
+        return self.history
+
+    def get_conversation_in_chat_format(self) -> list[dict[str, str]]:
+        return [
+            {"role": x.role.name, "content": x.message} for x in self.all_messages()
+        ]
+
+    def get_last_message(self) -> ConversationMessage:
+        return self.history[-1]
