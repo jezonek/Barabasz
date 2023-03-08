@@ -11,16 +11,16 @@ async def listen_to_websocket():
         os.getenv("SIGNAL_WEBSOCKET_RX_ENDPOINT")
     ) as websocket:
         with Manager() as conversation_manager:
-            # conversation_dict = conversation_manager.dict()
+            conversation_dict = conversation_manager.dict()
             conversation_dict = {}
             while True:
                 try:
                     message = await websocket.recv()
-                    process_message(conversation_dict, message)
-                # p = Process(
-                #     target=process_message, args=[conversation_dict, message]
-                # )
-                # p.run()
+                    # process_message(conversation_dict, message)
+                    p = Process(
+                        target=process_message, args=[conversation_dict, message]
+                    )
+                    p.run()
 
                 except KeyError as err:
                     print(

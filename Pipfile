@@ -7,6 +7,7 @@ name = "pypi"
 docker = "*"
 websockets = "*"
 openai = "==0.27.0"
+pytest = "*"
 
 [dev-packages]
 black = "*"

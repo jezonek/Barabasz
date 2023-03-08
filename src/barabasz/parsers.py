@@ -1,4 +1,5 @@
 import dataclasses
+import re
 from uuid import UUID
 from typing import List, Union
 from enum import Enum
@@ -25,7 +26,7 @@ class DataMessage:
     message: str
     expiresInSeconds: int
     viewOnce: bool
-    groupInfo:Union[GroupInfo, None] = None
+    groupInfo: Union[GroupInfo, None] = None
     mentions: list[Mention] = dataclasses.field(default_factory=list)
 
 
@@ -51,6 +52,12 @@ class Message:
 
     def is_mentioned(self):
         return True if self.envelope.dataMessage.mentions else False
+
+    def is_meta(self):
+        match = re.match(
+            r"!(?P<command>\w+) *(?P<rest>.*)", self.envelope.dataMessage.message
+        )
+        return True if match else False
 
 
 @dataclasses.dataclass
