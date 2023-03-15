@@ -3,6 +3,7 @@ import re
 from uuid import UUID
 from typing import List, Union
 from enum import Enum
+from .SETTINGS import MAIN_ADMIN_PROMPT
 
 
 @dataclasses.dataclass
@@ -55,7 +56,7 @@ class Message:
 
     def is_meta(self):
         match = re.match(
-            r"!(?P<command>\w+) *(?P<rest>.*)", self.envelope.dataMessage.message
+            r".*!(?P<command>\w+) *(?P<rest>.*)", self.envelope.dataMessage.message
         )
         return True if match else False
 
@@ -144,13 +145,27 @@ class ConversationMessage:
 
 @dataclasses.dataclass
 class Conversation:
-    history: list[ConversationMessage] = dataclasses.field(default_factory=list)
+    def __init__(
+        self,
+        history: list[ConversationMessage] = [
+            ConversationMessage(
+                role=Role.system,
+                message=MAIN_ADMIN_PROMPT,
+            )
+        ],
+    ) -> None:
+        self.history = history
 
     def add_message(self, message: ConversationMessage) -> None:
         self.history.append(message)
 
     def reset(self) -> None:
-        self.history.clear()
+        self.history = [
+            ConversationMessage(
+                role=Role.system,
+                message=MAIN_ADMIN_PROMPT,
+            )
+        ]
 
     def all_messages(self) -> list[ConversationMessage]:
         return self.history

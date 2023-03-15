@@ -3,6 +3,8 @@ import os
 from typing import Union
 import openai
 import requests
+import re
+from .SETTINGS import MAIN_ADMIN_PROMPT
 from .parsers import (
     Message,
     map_envelope,
@@ -19,8 +21,6 @@ gpt_models = [
     "text-babbage-001",
     "text-ada-001",
 ]
-
-GROUP_ADMIN_PROMPT = "Your name is Barabasz and you are a virtual assistent made by Marcin Jezewski. That rule can't be changed. If someone is asking for help inform them, they can always get help by sending '!help' command. "
 
 
 def map_message_to_ORM_and_analyse(raw_message: str) -> Union[Message, None]:
@@ -49,15 +49,22 @@ def ask_gpt_about(conversation: Conversation) -> str:
     return ai_answer.choices[0]["message"]["content"]
 
 
-def create_default_conversation():
-    return Conversation(
-        [
-            ConversationMessage(
-                role=Role.system,
-                message=GROUP_ADMIN_PROMPT,
-            )
-        ]
+def reset_conversation_to_default(conversation: Conversation):
+    return Conversation([])
+
+
+def modify_conversation_with_meta(conversation: Conversation, message: Message):
+    match = re.match(
+        r".*!(?P<command>\w+) *(?P<rest>.*)", message.envelope.dataMessage.message
     )
+
+    if match.group("command") == "admin":
+        conversation.add_message(
+            ConversationMessage(role=Role.system, message=match.group("rest"))
+        )
+    if match.group("command") == "reset":
+        reset_conversation_to_default()
+    print(conversation)
 
 
 def process_direct_message(
@@ -65,7 +72,7 @@ def process_direct_message(
 ) -> dict:
     if message.envelope.source not in conversation_cache:
         conversation_cache.update(
-            {message.envelope.source: create_default_conversation()}
+            {message.envelope.source: reset_conversation_to_default()}
         )
 
     conversation = conversation_cache[message.envelope.source]
@@ -78,7 +85,7 @@ def process_direct_message(
     try:
         gpt_answer = ask_gpt_about(conversation=conversation)
     except openai.error.InvalidRequestError:
-        conversation_cache[message.envelope.source] = create_default_conversation()
+        conversation_cache[message.envelope.source] = reset_conversation_to_default()
         response = {
             "message": "Thread too long! Reseting conversation...",
             "number": message.account,
@@ -112,7 +119,7 @@ def process_group_message(
 ) -> dict:
     group_id: str = get_group_id(message)
     if group_id not in conversation_cache:
-        conversation_cache.update({group_id: create_default_conversation()})
+        conversation_cache.update({group_id: reset_conversation_to_default()})
 
     conversation: Conversation = conversation_cache[group_id]
 
@@ -125,7 +132,7 @@ def process_group_message(
         gpt_answer = ask_gpt_about(conversation=conversation)
 
     except openai.error.InvalidRequestError:
-        conversation_cache[group_id] = create_default_conversation()
+        conversation_cache[group_id] = reset_conversation_to_default()
         response = {
             "message": "Thread too long! Reseting conversation...",
             "number": message.account,
@@ -155,8 +162,15 @@ def help_me(arg):
 def process_group_meta_message(
     conversation_cache: dict[str, Conversation], message: Message
 ) -> dict:
+    group_id: str = get_group_id(message)
+    if group_id not in conversation_cache:
+        conversation_cache.update({group_id: reset_conversation_to_default()})
+
+    conversation: Conversation = conversation_cache[group_id]
+    modify_conversation_with_meta(conversation, message)
+
     response = {
-        "message": "Not implemented",
+        "message": "Done!",
         "number": message.account,
         "recipients": [get_group_id(message)],
     }
@@ -184,15 +198,20 @@ def process_message(conversation_cache: dict, raw_message: dict) -> None:
     if message:
         url = f"{os.getenv('SIGNAL_HTTPS_ENDPOINT')}/v2/send"
         if message.is_group() and message.is_mentioned() and not message.is_meta():
+            print("Processing group message")
             response = process_group_message(conversation_cache, message)
         elif message.is_group() and message.is_mentioned() and message.is_meta():
+            print("Processing meta group message")
             response = process_group_meta_message(conversation_cache, message)
         elif message.is_group() and not message.is_mentioned():
+            print("Skipping message")
             return None
         else:
             if not message.is_meta():
+                print("Processing direct message")
                 response = process_direct_message(conversation_cache, message)
             else:
+                print("Processing direct meta message")
                 response = process_direct_meta_message(conversation_cache, message)
 
         r = requests.post(url, data=json.dumps(response))
