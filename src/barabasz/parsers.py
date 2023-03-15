@@ -167,6 +167,9 @@ class Conversation:
             )
         ]
 
+    def set_admin_conversation(self, messages: list[ConversationMessage]) -> None:
+        self.history = messages
+
     def all_messages(self) -> list[ConversationMessage]:
         return self.history
 
@@ -177,3 +180,6 @@ class Conversation:
 
     def get_last_message(self) -> ConversationMessage:
         return self.history[-1]
+
+    def __repr__(self) -> str:
+        return f"Conversation: {self.history}"

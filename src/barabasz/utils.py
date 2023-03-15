@@ -54,16 +54,22 @@ def reset_conversation_to_default(conversation: Conversation):
 
 
 def modify_conversation_with_meta(conversation: Conversation, message: Message):
-    match = re.match(
+    match: Union[re.Match, None] = re.match(
         r".*!(?P<command>\w+) *(?P<rest>.*)", message.envelope.dataMessage.message
     )
-
+    print(match)
     if match.group("command") == "admin":
-        conversation.add_message(
-            ConversationMessage(role=Role.system, message=match.group("rest"))
+        conversation.set_admin_conversation(
+            [
+                ConversationMessage(
+                    role=Role.system,
+                    message=f"{MAIN_ADMIN_PROMPT} {match.group('rest')}",
+                )
+            ]
         )
     if match.group("command") == "reset":
-        reset_conversation_to_default()
+        conversation.reset()
+
     print(conversation)
 
 
@@ -71,9 +77,7 @@ def process_direct_message(
     conversation_cache: dict[str, Conversation], message: Message
 ) -> dict:
     if message.envelope.source not in conversation_cache:
-        conversation_cache.update(
-            {message.envelope.source: reset_conversation_to_default()}
-        )
+        conversation_cache.update({message.envelope.source: Conversation()})
 
     conversation = conversation_cache[message.envelope.source]
 
@@ -85,7 +89,7 @@ def process_direct_message(
     try:
         gpt_answer = ask_gpt_about(conversation=conversation)
     except openai.error.InvalidRequestError:
-        conversation_cache[message.envelope.source] = reset_conversation_to_default()
+        conversation_cache[message.envelope.source] = Conversation()
         response = {
             "message": "Thread too long! Reseting conversation...",
             "number": message.account,
@@ -119,7 +123,7 @@ def process_group_message(
 ) -> dict:
     group_id: str = get_group_id(message)
     if group_id not in conversation_cache:
-        conversation_cache.update({group_id: reset_conversation_to_default()})
+        conversation_cache.update({group_id: Conversation()})
 
     conversation: Conversation = conversation_cache[group_id]
 
@@ -132,7 +136,7 @@ def process_group_message(
         gpt_answer = ask_gpt_about(conversation=conversation)
 
     except openai.error.InvalidRequestError:
-        conversation_cache[group_id] = reset_conversation_to_default()
+        conversation_cache[group_id] = Conversation()
         response = {
             "message": "Thread too long! Reseting conversation...",
             "number": message.account,
@@ -164,10 +168,11 @@ def process_group_meta_message(
 ) -> dict:
     group_id: str = get_group_id(message)
     if group_id not in conversation_cache:
-        conversation_cache.update({group_id: reset_conversation_to_default()})
+        conversation_cache.update({group_id: Conversation()})
 
     conversation: Conversation = conversation_cache[group_id]
     modify_conversation_with_meta(conversation, message)
+    conversation_cache[group_id] = conversation
 
     response = {
         "message": "Done!",
@@ -185,16 +190,24 @@ def process_group_meta_message(
 def process_direct_meta_message(
     conversation_cache: dict[str, Conversation], message: Message
 ) -> dict:
+    if message.envelope.source not in conversation_cache:
+        conversation_cache.update({message.envelope.source: Conversation()})
+
+    conversation = conversation_cache[message.envelope.source]
+
+    conversation: Conversation = conversation_cache[message.envelope.source]
+    modify_conversation_with_meta(conversation, message)
+
     response = {
-        "message": "Not implemented",
+        "message": "Done!",
         "number": message.account,
         "recipients": [message.envelope.source],
     }
     return response
 
 
-def process_message(conversation_cache: dict, raw_message: dict) -> None:
-    message: Message = map_message_to_ORM_and_analyse(raw_message)
+def process_message(conversation_cache: dict, raw_message: str) -> None:
+    message: Union[Message, None] = map_message_to_ORM_and_analyse(raw_message)
     if message:
         url = f"{os.getenv('SIGNAL_HTTPS_ENDPOINT')}/v2/send"
         if message.is_group() and message.is_mentioned() and not message.is_meta():
@@ -214,6 +227,7 @@ def process_message(conversation_cache: dict, raw_message: dict) -> None:
                 print("Processing direct meta message")
                 response = process_direct_meta_message(conversation_cache, message)
 
+        print(conversation_cache)
         r = requests.post(url, data=json.dumps(response))
 
 
